@@ -1,6 +1,7 @@
 package main
 
 import (
+	"context"
 	"fmt"
 	"log"
 	"net/http"
@@ -14,18 +15,34 @@ import (
 	"github.com/henry-clone/internal/enrichment"
 	"github.com/henry-clone/internal/figma"
 	"github.com/henry-clone/internal/llm"
+	"google.golang.org/genai"
 )
 
 func main() {
+	ctx := context.Background()
+
 	// Wire up dependencies
-	apiKey := os.Getenv("ANTHROPIC_API_KEY")
+	apiKey := os.Getenv("GEMINI_API_KEY")
 	var narrator deck.Narrator
+	var geminiClient *genai.Client
 	if apiKey != "" {
-		narrator = llm.NewAnthropicNarrator(apiKey)
-		log.Println("Using Claude for narrative generation")
+		gemini, err := llm.NewGeminiNarrator(ctx, apiKey)
+		if err != nil {
+			log.Fatalf("Failed to create Gemini narrator: %v", err)
+		}
+		narrator = gemini
+		// Also create a raw client for vision/aesthetic analysis
+		geminiClient, err = genai.NewClient(ctx, &genai.ClientConfig{
+			APIKey:  apiKey,
+			Backend: genai.BackendGeminiAPI,
+		})
+		if err != nil {
+			log.Fatalf("Failed to create Gemini client: %v", err)
+		}
+		log.Println("Using Gemini for narrative generation + vision analysis")
 	} else {
 		narrator = llm.NewStubNarrator()
-		log.Println("No ANTHROPIC_API_KEY set — using stub narrator")
+		log.Println("No GEMINI_API_KEY set — using stub narrator")
 	}
 
 	builder := deck.NewBuilder(narrator)
@@ -36,11 +53,12 @@ func main() {
 	geoProvider := enrichment.NewStubGeoProvider()
 
 	handler := api.NewHandler(api.HandlerConfig{
-		Builder:  builder,
-		Narrator: narrator,
-		Comps:    compsProvider,
-		Market:   marketProvider,
-		Geo:      geoProvider,
+		Builder:      builder,
+		Narrator:     narrator,
+		Comps:        compsProvider,
+		Market:       marketProvider,
+		Geo:          geoProvider,
+		GeminiClient: geminiClient,
 	})
 
 	// Figma integration (optional — needs FIGMA_TOKEN env var)

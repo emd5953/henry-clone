@@ -7,17 +7,37 @@ import (
 	"github.com/henry-clone/internal/domain"
 )
 
-// renderCover builds the cover page HTML.
+// renderCover builds the cover page HTML — the hero section of the deck.
 func (b *Builder) renderCover(deal *domain.Deal) string {
 	ac := string(deal.Property.AssetClass)
 	if len(ac) > 0 {
 		ac = strings.ToUpper(ac[:1]) + ac[1:]
 	}
-	return fmt.Sprintf(`<div class="cover">
+
+	tagline := "Confidential Offering Memorandum"
+	switch deal.DeckType {
+	case domain.DeckTypeBOV:
+		tagline = "Broker Opinion of Value"
+	case domain.DeckTypeTeaser:
+		tagline = "Investment Teaser"
+	case domain.DeckTypeFlyer:
+		tagline = "Leasing Opportunity"
+	case domain.DeckTypeSyndication:
+		tagline = "Syndication Deck"
+	}
+
+	return fmt.Sprintf(`<div class="cover-inner">
+		<p class="asset-class">%s | %d Units | %s SF</p>
 		<h1>%s</h1>
 		<p class="address">%s</p>
-		<p class="asset-class">%s | %d Units</p>
-	</div>`, deal.Property.Name, deal.Property.Address.OneLiner(), ac, deal.Property.Units)
+		<div class="cover-divider"></div>
+		<p class="cover-tagline">%s</p>
+	</div>`,
+		ac, deal.Property.Units, formatMoney(float64(deal.Property.SqFt)),
+		deal.Property.Name,
+		deal.Property.Address.OneLiner(),
+		tagline,
+	)
 }
 
 // renderFinancials builds the financial summary table.

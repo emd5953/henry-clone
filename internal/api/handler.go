@@ -5,8 +5,10 @@ import (
 	"encoding/hex"
 	"encoding/json"
 	"fmt"
+	"io"
 	"log"
 	"net/http"
+	"os"
 	"strconv"
 	"strings"
 	"sync"
@@ -19,6 +21,7 @@ import (
 	"github.com/henry-clone/internal/enrichment"
 	"github.com/henry-clone/internal/export"
 	"github.com/henry-clone/internal/parser"
+	"google.golang.org/genai"
 )
 
 // Handler serves the HTTP API.
@@ -30,27 +33,30 @@ type Handler struct {
 	market        enrichment.MarketDataProvider
 	geo           enrichment.GeoProvider
 	pdfExporter   *export.PDFExporter
+	geminiClient  *genai.Client
 	deals         map[string]*domain.Deal
 	mu            sync.RWMutex
 }
 
 type HandlerConfig struct {
-	Builder  *deck.Builder
-	Narrator deck.Narrator
-	Comps    enrichment.CompsProvider
-	Market   enrichment.MarketDataProvider
-	Geo      enrichment.GeoProvider
+	Builder      *deck.Builder
+	Narrator     deck.Narrator
+	Comps        enrichment.CompsProvider
+	Market       enrichment.MarketDataProvider
+	Geo          enrichment.GeoProvider
+	GeminiClient *genai.Client
 }
 
 func NewHandler(cfg HandlerConfig) *Handler {
 	return &Handler{
-		builder:     cfg.Builder,
-		narrator:    cfg.Narrator,
-		comps:       cfg.Comps,
-		market:      cfg.Market,
-		geo:         cfg.Geo,
-		pdfExporter: export.NewPDFExporter(),
-		deals:       make(map[string]*domain.Deal),
+		builder:      cfg.Builder,
+		narrator:     cfg.Narrator,
+		comps:        cfg.Comps,
+		market:       cfg.Market,
+		geo:          cfg.Geo,
+		geminiClient: cfg.GeminiClient,
+		pdfExporter:  export.NewPDFExporter(),
+		deals:        make(map[string]*domain.Deal),
 	}
 }
 
@@ -103,15 +109,25 @@ func (h *Handler) CreateDeal(w http.ResponseWriter, r *http.Request) {
 	deal.Status = domain.StatusPending
 
 	// Run the multi-agent pipeline
-	pipeline := agent.NewPipeline(
+	pipelineAgents := []agent.Agent{
 		agent.DataExtractionAgent(),
 		agent.FinancialAnalysisAgent(),
 		agent.CompsAgent(h.comps),
 		agent.MarketDataAgent(h.market),
 		agent.GeoAgent(h.geo),
+	}
+
+	// Add aesthetic analysis if we have a Gemini client (photo → design tokens)
+	if h.geminiClient != nil {
+		pipelineAgents = append(pipelineAgents, agent.AestheticAgent(h.geminiClient))
+	}
+
+	pipelineAgents = append(pipelineAgents,
 		agent.NarrativeAgent(h.narrator),
 		agent.AssemblyAgent(h.builder),
 	)
+
+	pipeline := agent.NewPipeline(pipelineAgents...)
 
 	state := agent.NewPipelineState()
 	state.Set(agent.KeyDeal, &deal)
@@ -199,7 +215,7 @@ func (h *Handler) ListDeals(w http.ResponseWriter, r *http.Request) {
 }
 
 func (h *Handler) parseDealFromForm(r *http.Request, deal *domain.Deal) error {
-	if err := r.ParseMultipartForm(10 << 20); err != nil {
+	if err := r.ParseMultipartForm(50 << 20); err != nil { // 50MB max for photos
 		return err
 	}
 
@@ -267,6 +283,36 @@ func (h *Handler) parseDealFromForm(r *http.Request, deal *domain.Deal) error {
 				return err
 			}
 			deal.T12 = *t12
+		}
+	}
+
+	// Handle property photo uploads — multiple files under "photos"
+	if r.MultipartForm != nil && r.MultipartForm.File["photos"] != nil {
+		uploadDir := fmt.Sprintf("uploads/%s", deal.ID)
+		os.MkdirAll(uploadDir, 0755)
+
+		for i, fh := range r.MultipartForm.File["photos"] {
+			file, err := fh.Open()
+			if err != nil {
+				continue
+			}
+			ext := ".jpg"
+			if strings.HasSuffix(strings.ToLower(fh.Filename), ".png") {
+				ext = ".png"
+			} else if strings.HasSuffix(strings.ToLower(fh.Filename), ".webp") {
+				ext = ".webp"
+			}
+			savePath := fmt.Sprintf("%s/photo_%d%s", uploadDir, i, ext)
+			out, err := os.Create(savePath)
+			if err != nil {
+				file.Close()
+				continue
+			}
+			io.Copy(out, file)
+			out.Close()
+			file.Close()
+
+			deal.PhotoURLs = append(deal.PhotoURLs, savePath)
 		}
 	}
 
