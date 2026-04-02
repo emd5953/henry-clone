@@ -26,31 +26,31 @@
   --color-ring: var(--ring);
 }
 
-/* Dark theme by default — matching LeaseIQ aesthetic */
+/* LeaseIQ palette — warm, earthy, elegant */
 :root {
-  --radius: 0.625rem;
-  --background: oklch(0.1 0 0);
-  --foreground: oklch(0.95 0 0);
-  --card: oklch(0.15 0 0);
-  --card-foreground: oklch(0.95 0 0);
-  --primary: oklch(0.92 0 0);
-  --primary-foreground: oklch(0.15 0 0);
-  --secondary: oklch(0.2 0 0);
-  --secondary-foreground: oklch(0.95 0 0);
-  --muted: oklch(0.2 0 0);
-  --muted-foreground: oklch(0.6 0 0);
-  --accent: oklch(0.2 0 0);
-  --accent-foreground: oklch(0.95 0 0);
-  --destructive: oklch(0.65 0.2 25);
-  --border: oklch(1 0 0 / 10%);
-  --input: oklch(1 0 0 / 15%);
-  --ring: oklch(0.5 0 0);
+  --radius: 0.75rem;
+  --background: #F9F8F4;
+  --foreground: #2D3A31;
+  --card: #FFFFFF;
+  --card-foreground: #2D3A31;
+  --primary: #8C9A84;
+  --primary-foreground: #FFFFFF;
+  --secondary: #DCCFC2;
+  --secondary-foreground: #2D3A31;
+  --muted: #F2F0EB;
+  --muted-foreground: #7A8578;
+  --accent: #C27B66;
+  --accent-foreground: #FFFFFF;
+  --destructive: #C0392B;
+  --border: #E6E2DA;
+  --input: #E6E2DA;
+  --ring: #8C9A84;
 }
 
 @layer base {
   * { @apply border-border; }
   body {
     @apply bg-background text-foreground antialiased;
-    font-family: 'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
+    font-family: 'Source Sans 3', 'Inter', -apple-system, sans-serif;
   }
 }

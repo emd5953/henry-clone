@@ -18,19 +18,19 @@ export function FigmaPanel({ deal, onLinked }: Props) {
   };
 
   return (
-    <div className="mt-4 pt-4 border-t border-white/[0.06]">
-      <p className="text-[10px] font-semibold uppercase tracking-wider text-[#555] mb-2 px-1">Figma</p>
+    <div className="mt-4 pt-4 border-t border-[#E6E2DA]">
+      <p className="text-[10px] font-bold uppercase tracking-widest text-[#C27B66] mb-2 px-1">Figma</p>
       {isLinked ? (
         <div className="space-y-2">
           <a href={deal.figma_file_url} target="_blank" rel="noopener noreferrer"
-            className="flex items-center justify-center gap-1.5 w-full py-2 text-xs font-medium bg-[#1e1e1e] text-white rounded-lg hover:bg-[#2a2a2a] transition-all">
+            className="flex items-center justify-center gap-1.5 w-full py-2 text-xs font-medium bg-[#2D3A31] text-white rounded-lg hover:bg-[#3D4A41] transition-all">
             <ExternalLink className="w-3 h-3" />Open in Figma
           </a>
           <div className="flex gap-1">
             <input value={comment} onChange={(e) => setComment(e.target.value)} placeholder="Comment..."
-              className="flex-1 bg-white/[0.05] border border-white/[0.08] rounded-lg px-2 py-1.5 text-[11px] text-white placeholder-[#555] focus:outline-none" />
+              className="flex-1 bg-white border border-[#E6E2DA] rounded-lg px-2 py-1.5 text-[11px] text-[#2D3A31] placeholder-[#B5B0A8] focus:outline-none" />
             <button onClick={async () => { setPosting(true); await postFigmaComment(deal.id, comment); setComment(''); setPosting(false); }}
-              disabled={posting || !comment.trim()} className="p-1.5 text-[#666] hover:text-white transition-colors disabled:opacity-30">
+              disabled={posting || !comment.trim()} className="p-1.5 text-[#B5B0A8] hover:text-[#2D3A31] transition-colors disabled:opacity-30">
               <Send className="w-3 h-3" />
             </button>
           </div>
@@ -38,9 +38,9 @@ export function FigmaPanel({ deal, onLinked }: Props) {
       ) : (
         <div className="space-y-2">
           <input value={figmaUrl} onChange={(e) => setFigmaUrl(e.target.value)} placeholder="Paste Figma URL..."
-            className="w-full bg-white/[0.05] border border-white/[0.08] rounded-lg px-3 py-1.5 text-[11px] text-white placeholder-[#555] focus:outline-none focus:border-blue-500/50" />
+            className="w-full bg-white border border-[#E6E2DA] rounded-lg px-3 py-1.5 text-[11px] text-[#2D3A31] placeholder-[#B5B0A8] focus:outline-none focus:border-[#8C9A84]" />
           <button onClick={async () => { setLinking(true); const r = await linkFigmaFile(deal.id, extractFileKey(figmaUrl)); onLinked(r.file_key, r.file_url); setLinking(false); }}
-            disabled={linking || !figmaUrl.trim()} className="w-full py-1.5 text-xs font-medium bg-white/[0.08] text-[#888] rounded-lg hover:bg-white/[0.12] hover:text-white transition-all disabled:opacity-30">
+            disabled={linking || !figmaUrl.trim()} className="w-full py-1.5 text-xs font-medium border border-[#E6E2DA] text-[#7A8578] rounded-lg hover:bg-[#F2F0EB] hover:text-[#2D3A31] transition-all disabled:opacity-30">
             {linking ? 'Linking...' : 'Link Figma File'}
           </button>
         </div>

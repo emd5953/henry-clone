@@ -25,22 +25,13 @@ export function DeckEditor({ deal, onBack, reviewMode = false }: Props) {
     if (!contentRef.current || !titleRef.current) return;
     setSaving(true);
     try {
-      const saveFn = reviewMode ? reviewEdit : updateSection;
-      const updated = await saveFn(deal.id, activeIdx, {
-        title: titleRef.current.innerText,
-        content: contentRef.current.innerHTML,
-      });
+      const fn = reviewMode ? reviewEdit : updateSection;
+      const updated = await fn(deal.id, activeIdx, { title: titleRef.current.innerText, content: contentRef.current.innerHTML });
       const s = [...sections]; s[activeIdx] = updated; setSections(s);
     } finally { setSaving(false); }
   }, [deal.id, activeIdx, sections, reviewMode]);
 
-  const handleBlur = useCallback(() => { saveSection(); }, [saveSection]);
-
-  const loadPreview = async () => {
-    const html = await getDeckHTML(deal.id);
-    setPreviewHTML(html);
-    setShowPreview(true);
-  };
+  const loadPreview = async () => { setPreviewHTML(await getDeckHTML(deal.id)); setShowPreview(true); };
 
   useEffect(() => {
     if (showPreview && iframeRef.current && previewHTML) {
@@ -53,55 +44,52 @@ export function DeckEditor({ deal, onBack, reviewMode = false }: Props) {
   const activeSection = sections[activeIdx];
 
   return (
-    <div className="flex flex-col h-[calc(100vh-7rem)]">
-      {/* Toolbar */}
-      <div className="flex items-center gap-3 pb-4 border-b border-white/[0.06] mb-4">
-        <button onClick={onBack} className="text-[#666] hover:text-white transition-colors"><ArrowLeft className="w-4 h-4" /></button>
-        <h2 className="text-sm font-semibold text-white flex-1">
+    <div className="flex flex-col" style={{ height: 'calc(100vh - 8rem)' }}>
+      <div className="flex items-center gap-3 pb-4 border-b border-[#E6E2DA] mb-4">
+        <button onClick={onBack} className="text-[#7A8578] hover:text-[#2D3A31] transition-colors"><ArrowLeft className="w-4 h-4" /></button>
+        <h2 className="text-sm font-semibold text-[#2D3A31] flex-1" style={{ fontFamily: "'Playfair Display', serif" }}>
           {deal.property.name}
-          {reviewMode && <span className="ml-2 text-[10px] font-semibold uppercase tracking-wider px-2 py-0.5 rounded-full bg-yellow-500/20 text-yellow-400">QC Review</span>}
+          {reviewMode && <span className="ml-2 text-[10px] font-semibold uppercase tracking-wider px-2 py-0.5 rounded-full bg-[#C27B66]/15 text-[#C27B66]">QC Review</span>}
         </h2>
-        {saving && <span className="text-[11px] text-[#555] animate-pulse">Saving...</span>}
+        {saving && <span className="text-[11px] text-[#B5B0A8] animate-pulse">Saving...</span>}
         <button onClick={() => { setShowPreview(!showPreview); if (!showPreview) loadPreview(); }}
-          className="flex items-center gap-1.5 px-3 py-1.5 text-xs font-medium text-[#888] border border-white/[0.08] rounded-lg hover:bg-white/[0.05] transition-all">
+          className="flex items-center gap-1.5 px-3 py-1.5 text-xs font-medium text-[#7A8578] border border-[#E6E2DA] rounded-lg hover:bg-[#F2F0EB] transition-all">
           <Eye className="w-3.5 h-3.5" />{showPreview ? 'Edit' : 'Preview'}
         </button>
         <a href={getDeckPDFUrl(deal.id)} target="_blank" rel="noopener noreferrer"
-          className="flex items-center gap-1.5 px-3 py-1.5 text-xs font-medium bg-white text-black rounded-lg hover:bg-white/90 transition-all">
+          className="flex items-center gap-1.5 px-3 py-1.5 text-xs font-semibold bg-[#2D3A31] text-white rounded-lg hover:bg-[#3D4A41] transition-all">
           <Download className="w-3.5 h-3.5" />PDF
         </a>
       </div>
 
       {showPreview ? (
-        <iframe ref={iframeRef} title="Deck Preview" className="flex-1 rounded-xl border border-white/[0.08] bg-white" />
+        <iframe ref={iframeRef} title="Deck Preview" className="flex-1 rounded-xl border border-[#E6E2DA] bg-white" />
       ) : (
         <div className="flex gap-4 flex-1 min-h-0">
-          {/* Section Nav */}
           <div className="w-52 shrink-0 overflow-y-auto space-y-0.5">
-            <p className="text-[10px] font-semibold uppercase tracking-wider text-[#555] mb-2 px-1">Sections</p>
+            <p className="text-[10px] font-bold uppercase tracking-widest text-[#C27B66] mb-2 px-1">Sections</p>
             {sections.map((s, i) => (
               <button key={i} onClick={() => setActiveIdx(i)}
                 className={`w-full text-left px-3 py-2 rounded-lg text-xs transition-all ${
-                  i === activeIdx ? 'bg-white/10 text-white' : 'text-[#666] hover:bg-white/[0.04] hover:text-[#aaa]'
+                  i === activeIdx ? 'bg-[#8C9A84]/10 text-[#2D3A31] border border-[#8C9A84]/20' : 'text-[#7A8578] hover:bg-[#F2F0EB]'
                 }`}>
-                <span className="block text-[9px] uppercase tracking-wider text-[#555]">{s.type.replace(/_/g, ' ')}</span>
+                <span className="block text-[9px] uppercase tracking-wider text-[#B5B0A8]">{s.type.replace(/_/g, ' ')}</span>
                 <span className="block font-medium truncate">{s.title}</span>
               </button>
             ))}
 
             {reviewMode && (
-              <div className="mt-4 pt-4 border-t border-white/[0.06] space-y-2">
-                <p className="text-[10px] font-semibold uppercase tracking-wider text-[#555] px-1">Review</p>
-                <textarea value={reviewNotes} onChange={(e) => setReviewNotes(e.target.value)}
-                  placeholder="QC notes..." rows={3}
-                  className="w-full bg-white/[0.05] border border-white/[0.08] rounded-lg px-3 py-2 text-xs text-white placeholder-[#555] resize-none focus:outline-none focus:border-blue-500/50" />
+              <div className="mt-4 pt-4 border-t border-[#E6E2DA] space-y-2">
+                <p className="text-[10px] font-bold uppercase tracking-widest text-[#C27B66] px-1">Review</p>
+                <textarea value={reviewNotes} onChange={(e) => setReviewNotes(e.target.value)} placeholder="QC notes..." rows={3}
+                  className="w-full bg-white border border-[#E6E2DA] rounded-lg px-3 py-2 text-xs text-[#2D3A31] placeholder-[#B5B0A8] resize-none focus:outline-none focus:border-[#8C9A84]" />
                 <div className="flex gap-1.5">
                   <button onClick={async () => { setCompleting(true); await completeReview(deal.id, 'approved', reviewNotes); setCompleting(false); onBack(); }}
-                    disabled={completing} className="flex-1 flex items-center justify-center gap-1 py-1.5 text-xs font-semibold bg-emerald-500/20 text-emerald-400 rounded-lg hover:bg-emerald-500/30 transition-all disabled:opacity-50">
+                    disabled={completing} className="flex-1 flex items-center justify-center gap-1 py-1.5 text-xs font-semibold bg-[#8C9A84] text-white rounded-lg hover:bg-[#7A8A72] transition-all disabled:opacity-50">
                     <Check className="w-3 h-3" />Approve
                   </button>
                   <button onClick={async () => { setCompleting(true); await completeReview(deal.id, 'needs_revision', reviewNotes); setCompleting(false); onBack(); }}
-                    disabled={completing} className="flex-1 flex items-center justify-center gap-1 py-1.5 text-xs font-semibold bg-red-500/20 text-red-400 rounded-lg hover:bg-red-500/30 transition-all disabled:opacity-50">
+                    disabled={completing} className="flex-1 flex items-center justify-center gap-1 py-1.5 text-xs font-semibold bg-[#C27B66] text-white rounded-lg hover:bg-[#B06A55] transition-all disabled:opacity-50">
                     <X className="w-3 h-3" />Reject
                   </button>
                 </div>
@@ -111,18 +99,16 @@ export function DeckEditor({ deal, onBack, reviewMode = false }: Props) {
             <FigmaPanel deal={dealState} onLinked={(k, u) => setDealState({ ...dealState, figma_file_key: k, figma_file_url: u })} />
           </div>
 
-          {/* Editor */}
-          <div className="flex-1 rounded-xl border border-white/[0.08] bg-white/[0.02] overflow-y-auto">
+          <div className="flex-1 rounded-xl border border-[#E6E2DA] bg-white overflow-y-auto shadow-[0_4px_6px_-1px_rgba(45,58,49,0.05)]">
             {activeSection && (
               <div className="p-6">
-                <span className="text-[10px] font-semibold uppercase tracking-wider text-blue-400">{activeSection.type.replace(/_/g, ' ')}</span>
-                <h3 ref={titleRef} contentEditable suppressContentEditableWarning onBlur={handleBlur}
-                  className="text-lg font-semibold text-white mt-1 mb-4 outline-none border-b border-transparent focus:border-blue-500/30 pb-1 transition-colors">
+                <span className="text-[10px] font-bold uppercase tracking-widest text-[#C27B66]">{activeSection.type.replace(/_/g, ' ')}</span>
+                <h3 ref={titleRef} contentEditable suppressContentEditableWarning onBlur={() => saveSection()}
+                  className="text-lg font-semibold text-[#2D3A31] mt-1 mb-4 outline-none border-b-2 border-transparent focus:border-[#8C9A84]/30 pb-1 transition-colors"
+                  style={{ fontFamily: "'Playfair Display', serif" }}>
                   {activeSection.title}
                 </h3>
-
-                {/* Formatting toolbar */}
-                <div className="flex gap-0.5 mb-3 pb-3 border-b border-white/[0.06]">
+                <div className="flex gap-0.5 mb-3 pb-3 border-b border-[#E6E2DA]">
                   {[
                     { icon: Bold, cmd: 'bold' }, { icon: Italic, cmd: 'italic' }, { icon: Underline, cmd: 'underline' },
                     null,
@@ -130,17 +116,16 @@ export function DeckEditor({ deal, onBack, reviewMode = false }: Props) {
                     null,
                     { icon: Type, cmd: 'formatBlock', val: 'h3' }, { icon: Eraser, cmd: 'removeFormat' },
                   ].map((item, i) => item === null
-                    ? <div key={i} className="w-px h-5 bg-white/[0.08] mx-1" />
+                    ? <div key={i} className="w-px h-5 bg-[#E6E2DA] mx-1" />
                     : <button key={i} onClick={() => exec(item.cmd, item.val)}
-                        className="p-1.5 rounded text-[#666] hover:text-white hover:bg-white/[0.08] transition-all">
+                        className="p-1.5 rounded text-[#B5B0A8] hover:text-[#2D3A31] hover:bg-[#F2F0EB] transition-all">
                         <item.icon className="w-3.5 h-3.5" />
                       </button>
                   )}
                 </div>
-
-                <div ref={contentRef} contentEditable suppressContentEditableWarning onBlur={handleBlur}
+                <div ref={contentRef} contentEditable suppressContentEditableWarning onBlur={() => saveSection()}
                   dangerouslySetInnerHTML={{ __html: activeSection.content }}
-                  className="prose prose-invert prose-sm max-w-none text-[#ccc] leading-relaxed outline-none min-h-[200px] [&_table]:w-full [&_table]:border-collapse [&_th]:text-left [&_th]:text-[10px] [&_th]:uppercase [&_th]:tracking-wider [&_th]:text-[#666] [&_th]:pb-2 [&_th]:border-b [&_th]:border-white/[0.08] [&_td]:py-2 [&_td]:border-b [&_td]:border-white/[0.04] [&_td]:text-sm" />
+                  className="text-sm text-[#2D3A31] leading-relaxed outline-none min-h-[200px] [&_table]:w-full [&_table]:border-collapse [&_th]:text-left [&_th]:text-[10px] [&_th]:uppercase [&_th]:tracking-wider [&_th]:text-[#7A8578] [&_th]:pb-2 [&_th]:border-b [&_th]:border-[#E6E2DA] [&_td]:py-2 [&_td]:border-b [&_td]:border-[#F2F0EB] [&_td]:text-sm [&_p]:mb-3" />
               </div>
             )}
           </div>
