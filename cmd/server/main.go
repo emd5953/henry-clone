@@ -12,25 +12,25 @@ import (
 	"github.com/henry-clone/internal/api"
 	"github.com/henry-clone/internal/deck"
 	"github.com/henry-clone/internal/enrichment"
+	"github.com/henry-clone/internal/figma"
 	"github.com/henry-clone/internal/llm"
 )
 
 func main() {
 	// Wire up dependencies
-	apiKey := os.Getenv("OPENAI_API_KEY")
+	apiKey := os.Getenv("ANTHROPIC_API_KEY")
 	var narrator deck.Narrator
 	if apiKey != "" {
-		narrator = llm.NewOpenAINarrator(apiKey)
-		log.Println("Using OpenAI for narrative generation")
+		narrator = llm.NewAnthropicNarrator(apiKey)
+		log.Println("Using Claude for narrative generation")
 	} else {
 		narrator = llm.NewStubNarrator()
-		log.Println("No OPENAI_API_KEY set — using stub narrator")
+		log.Println("No ANTHROPIC_API_KEY set — using stub narrator")
 	}
 
 	builder := deck.NewBuilder(narrator)
 
-	// Enrichment providers — stubs for now, swap for real APIs later
-	// (CoStar, Reonomy, Census, Google Maps, etc.)
+	// Enrichment providers — stubs for now
 	compsProvider := enrichment.NewStubCompsProvider()
 	marketProvider := enrichment.NewStubMarketDataProvider()
 	geoProvider := enrichment.NewStubGeoProvider()
@@ -43,13 +43,23 @@ func main() {
 		Geo:      geoProvider,
 	})
 
+	// Figma integration (optional — needs FIGMA_TOKEN env var)
+	var figmaHandler *api.FigmaHandler
+	if figmaToken := os.Getenv("FIGMA_TOKEN"); figmaToken != "" {
+		bridge := figma.NewBridge(figmaToken)
+		figmaHandler = api.NewFigmaHandler(bridge, handler)
+		log.Println("Figma integration enabled")
+	} else {
+		log.Println("No FIGMA_TOKEN set — Figma integration disabled")
+	}
+
 	r := chi.NewRouter()
 	r.Use(middleware.Logger)
 	r.Use(middleware.Recoverer)
 	r.Use(middleware.RequestID)
 	r.Use(cors.Handler(cors.Options{
 		AllowedOrigins: []string{"*"},
-		AllowedMethods: []string{"GET", "POST", "OPTIONS"},
+		AllowedMethods: []string{"GET", "POST", "PUT", "OPTIONS"},
 		AllowedHeaders: []string{"Content-Type", "Authorization"},
 	}))
 
@@ -68,17 +78,22 @@ func main() {
 	r.Post("/api/deals/{dealID}/review/complete", handler.CompleteReview)
 	r.Post("/api/deals/{dealID}/review/edit", handler.ReviewEdit)
 
+	// Figma integration
+	if figmaHandler != nil {
+		r.Post("/api/deals/{dealID}/figma/link", figmaHandler.LinkFigmaFile)
+		r.Get("/api/deals/{dealID}/figma", figmaHandler.GetFigmaFile)
+		r.Get("/api/deals/{dealID}/figma/export", figmaHandler.ExportFigmaPDF)
+		r.Post("/api/deals/{dealID}/figma/comment", figmaHandler.PostFigmaComment)
+	}
+
 	// Serve React frontend (static files)
 	r.Get("/*", func(w http.ResponseWriter, r *http.Request) {
-		// Try to serve from frontend/dist, fall back to index.html for SPA routing
 		fsHandler := http.FileServer(http.Dir("frontend/dist"))
-		// Check if file exists
 		path := r.URL.Path
 		if path == "/" {
 			path = "/index.html"
 		}
 		if _, err := http.Dir("frontend/dist").Open(path); err != nil {
-			// SPA fallback — serve index.html for client-side routing
 			http.ServeFile(w, r, "frontend/dist/index.html")
 			return
 		}

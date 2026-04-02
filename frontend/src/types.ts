@@ -9,6 +9,9 @@ export interface Deal {
   deck?: Deck;
   comps?: Comp[];
   market_data?: MarketData;
+  review?: Review;
+  figma_file_key?: string;
+  figma_file_url?: string;
 }
 
 export interface Property {
@@ -67,4 +70,14 @@ export interface MarketData {
   population: number;
   median_income: number;
   vacancy_rate: number;
+}
+
+export interface Review {
+  id: string;
+  deal_id: string;
+  reviewer_id: string;
+  status: string;
+  started_at?: string;
+  completed_at?: string;
+  notes?: string;
 }

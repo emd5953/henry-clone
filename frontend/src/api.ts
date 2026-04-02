@@ -90,3 +90,28 @@ export async function reviewEdit(
   if (!res.ok) throw new Error(await res.text());
   return res.json();
 }
+
+// Figma integration APIs
+export async function linkFigmaFile(dealId: string, fileKey: string) {
+  const res = await fetch(`${BASE}/deals/${dealId}/figma/link`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ file_key: fileKey }),
+  });
+  if (!res.ok) throw new Error(await res.text());
+  return res.json();
+}
+
+export async function postFigmaComment(dealId: string, message: string) {
+  const res = await fetch(`${BASE}/deals/${dealId}/figma/comment`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ message }),
+  });
+  if (!res.ok) throw new Error(await res.text());
+  return res.json();
+}
+
+export function getFigmaExportUrl(dealId: string): string {
+  return `${BASE}/deals/${dealId}/figma/export`;
+}

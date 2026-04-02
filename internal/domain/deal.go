@@ -34,6 +34,10 @@ type Deal struct {
 
 	// QC Review — human review before delivery
 	Review *Review `json:"review,omitempty"`
+
+	// Figma integration — deck editing in Figma
+	FigmaFileKey string `json:"figma_file_key,omitempty"`
+	FigmaFileURL string `json:"figma_file_url,omitempty"`
 }
 
 type DealStatus string

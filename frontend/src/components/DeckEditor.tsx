@@ -8,6 +8,7 @@ import {
   completeReview,
 } from '../api';
 import type { Deal, Section } from '../types';
+import { FigmaPanel } from './FigmaPanel';
 
 interface Props {
   deal: Deal;
@@ -23,6 +24,7 @@ export function DeckEditor({ deal, onBack, reviewMode = false }: Props) {
   const [saving, setSaving] = useState(false);
   const [reviewNotes, setReviewNotes] = useState('');
   const [completing, setCompleting] = useState(false);
+  const [dealState, setDealState] = useState(deal);
   const iframeRef = useRef<HTMLIFrameElement>(null);
   const contentRef = useRef<HTMLDivElement>(null);
   const titleRef = useRef<HTMLHeadingElement>(null);
@@ -165,6 +167,17 @@ export function DeckEditor({ deal, onBack, reviewMode = false }: Props) {
                 </div>
               </div>
             )}
+
+            <FigmaPanel
+              deal={dealState}
+              onLinked={(fileKey, fileUrl) => {
+                setDealState({
+                  ...dealState,
+                  figma_file_key: fileKey,
+                  figma_file_url: fileUrl,
+                });
+              }}
+            />
           </aside>
 
           <div className="section-editor">
