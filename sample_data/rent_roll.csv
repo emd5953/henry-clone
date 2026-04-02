@@ -1,0 +1,11 @@
+unit_id,tenant,sq_ft,monthly_rent
+101,Acme Corp,1200,2850
+102,Bay Area Dental,950,2200
+103,Summit Legal Group,1400,3100
+104,,1100,0
+105,Redwood Financial,1350,3000
+106,Pacific Design Studio,800,1900
+107,Golden Gate Consulting,1500,3400
+108,,900,0
+109,Marina Wellness Center,1100,2600
+110,Coastal Property Mgmt,1000,2350
