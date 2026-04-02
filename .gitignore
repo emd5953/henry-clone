@@ -1,0 +1,42 @@
+# Binaries / build output
+*.exe
+*.exe~
+*.dll
+*.so
+*.dylib
+*.out
+*.bin
+*.test
+
+# Go
+vendor/
+*.mod.bak
+
+# Environment / secrets
+.env
+.env.*
+*.pem
+*.key
+
+# OS files
+.DS_Store
+Thumbs.db
+
+# IDE / editor
+.vscode/
+.idea/
+*.swp
+*.swo
+*~
+
+# Frontend (handled by frontend/.gitignore too)
+frontend/node_modules/
+frontend/dist/
+frontend/dist-ssr/
+
+# Logs
+*.log
+
+# Sample output / temp
+tmp/
+*.tmp
