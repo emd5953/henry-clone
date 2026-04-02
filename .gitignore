@@ -40,3 +40,5 @@ frontend/dist-ssr/
 # Sample output / temp
 tmp/
 *.tmp
+
+.kiro
