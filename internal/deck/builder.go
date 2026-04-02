@@ -146,3 +146,9 @@ func (b *Builder) Build(ctx context.Context, deal *domain.Deal) error {
 
 	return nil
 }
+
+// RebuildHTML regenerates the HTML from the current sections.
+// Called after a section is edited via the deck editor.
+func (b *Builder) RebuildHTML(deal *domain.Deal) string {
+	return b.assembleHTML(deal, deal.Deck.Sections)
+}

@@ -31,6 +31,9 @@ type Deal struct {
 
 	// Output — the generated deck
 	Deck *Deck `json:"deck,omitempty"`
+
+	// QC Review — human review before delivery
+	Review *Review `json:"review,omitempty"`
 }
 
 type DealStatus string
@@ -40,6 +43,8 @@ const (
 	StatusAnalyzing  DealStatus = "analyzing"
 	StatusGenerating DealStatus = "generating"
 	StatusReady      DealStatus = "ready"
+	StatusInReview   DealStatus = "in_review"
+	StatusApproved   DealStatus = "approved"
 	StatusFailed     DealStatus = "failed"
 )
 

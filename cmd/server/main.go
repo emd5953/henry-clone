@@ -58,6 +58,32 @@ func main() {
 	r.Get("/api/deals", handler.ListDeals)
 	r.Get("/api/deals/{dealID}", handler.GetDeal)
 	r.Get("/api/deals/{dealID}/deck", handler.GetDeck)
+	r.Get("/api/deals/{dealID}/deck.pdf", handler.GetDeckPDF)
+	r.Get("/api/deals/{dealID}/sections", handler.GetSections)
+	r.Put("/api/deals/{dealID}/sections/{sectionIdx}", handler.UpdateSection)
+
+	// QC Review workflow
+	r.Get("/api/reviews", handler.GetReviewQueue)
+	r.Post("/api/deals/{dealID}/review/start", handler.StartReview)
+	r.Post("/api/deals/{dealID}/review/complete", handler.CompleteReview)
+	r.Post("/api/deals/{dealID}/review/edit", handler.ReviewEdit)
+
+	// Serve React frontend (static files)
+	r.Get("/*", func(w http.ResponseWriter, r *http.Request) {
+		// Try to serve from frontend/dist, fall back to index.html for SPA routing
+		fsHandler := http.FileServer(http.Dir("frontend/dist"))
+		// Check if file exists
+		path := r.URL.Path
+		if path == "/" {
+			path = "/index.html"
+		}
+		if _, err := http.Dir("frontend/dist").Open(path); err != nil {
+			// SPA fallback — serve index.html for client-side routing
+			http.ServeFile(w, r, "frontend/dist/index.html")
+			return
+		}
+		fsHandler.ServeHTTP(w, r)
+	})
 
 	port := os.Getenv("PORT")
 	if port == "" {

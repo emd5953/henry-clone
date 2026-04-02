@@ -4,6 +4,7 @@ import (
 	"crypto/rand"
 	"encoding/hex"
 	"encoding/json"
+	"fmt"
 	"log"
 	"net/http"
 	"strconv"
@@ -16,6 +17,7 @@ import (
 	"github.com/henry-clone/internal/deck"
 	"github.com/henry-clone/internal/domain"
 	"github.com/henry-clone/internal/enrichment"
+	"github.com/henry-clone/internal/export"
 	"github.com/henry-clone/internal/parser"
 )
 
@@ -27,6 +29,7 @@ type Handler struct {
 	comps         enrichment.CompsProvider
 	market        enrichment.MarketDataProvider
 	geo           enrichment.GeoProvider
+	pdfExporter   *export.PDFExporter
 	deals         map[string]*domain.Deal
 	mu            sync.RWMutex
 }
@@ -41,12 +44,13 @@ type HandlerConfig struct {
 
 func NewHandler(cfg HandlerConfig) *Handler {
 	return &Handler{
-		builder:  cfg.Builder,
-		narrator: cfg.Narrator,
-		comps:    cfg.Comps,
-		market:   cfg.Market,
-		geo:      cfg.Geo,
-		deals:    make(map[string]*domain.Deal),
+		builder:     cfg.Builder,
+		narrator:    cfg.Narrator,
+		comps:       cfg.Comps,
+		market:      cfg.Market,
+		geo:         cfg.Geo,
+		pdfExporter: export.NewPDFExporter(),
+		deals:       make(map[string]*domain.Deal),
 	}
 }
 
@@ -223,27 +227,47 @@ func (h *Handler) parseDealFromForm(r *http.Request, deal *domain.Deal) error {
 		deal.Property.YearBuilt, _ = strconv.Atoi(yb)
 	}
 
-	// Parse rent roll CSV
-	if file, _, err := r.FormFile("rent_roll"); err == nil {
+	// Parse rent roll — CSV or Excel
+	if file, header, err := r.FormFile("rent_roll"); err == nil {
 		defer file.Close()
-		rr, err := parser.ParseRentRoll(file)
-		if err != nil {
-			return err
+		docType, _ := parser.DetectDocumentType(header.Filename)
+		switch docType {
+		case parser.DocTypeExcel:
+			rr, err := parser.ParseRentRollExcel(file)
+			if err != nil {
+				return err
+			}
+			deal.RentRoll = *rr
+		default: // CSV fallback
+			rr, err := parser.ParseRentRoll(file)
+			if err != nil {
+				return err
+			}
+			deal.RentRoll = *rr
 		}
-		deal.RentRoll = *rr
 		if deal.Property.Units == 0 {
-			deal.Property.Units = len(rr.Units)
+			deal.Property.Units = len(deal.RentRoll.Units)
 		}
 	}
 
-	// Parse T12 CSV
-	if file, _, err := r.FormFile("t12"); err == nil {
+	// Parse T12 — CSV or Excel
+	if file, header, err := r.FormFile("t12"); err == nil {
 		defer file.Close()
-		t12, err := parser.ParseT12(file)
-		if err != nil {
-			return err
+		docType, _ := parser.DetectDocumentType(header.Filename)
+		switch docType {
+		case parser.DocTypeExcel:
+			t12, err := parser.ParseT12Excel(file)
+			if err != nil {
+				return err
+			}
+			deal.T12 = *t12
+		default:
+			t12, err := parser.ParseT12(file)
+			if err != nil {
+				return err
+			}
+			deal.T12 = *t12
 		}
-		deal.T12 = *t12
 	}
 
 	return nil
@@ -254,4 +278,114 @@ func generateID() string {
 	b := make([]byte, 8)
 	rand.Read(b)
 	return hex.EncodeToString(b)
+}
+
+// GetDeckPDF handles GET /api/deals/{dealID}/deck.pdf
+// Converts the HTML deck to PDF using headless Chrome.
+// Henry delivers as weblink + PDF — this is the PDF path.
+func (h *Handler) GetDeckPDF(w http.ResponseWriter, r *http.Request) {
+	dealID := chi.URLParam(r, "dealID")
+
+	h.mu.RLock()
+	deal, ok := h.deals[dealID]
+	h.mu.RUnlock()
+
+	if !ok {
+		http.Error(w, "deal not found", http.StatusNotFound)
+		return
+	}
+
+	if deal.Deck == nil {
+		http.Error(w, "deck not yet generated", http.StatusAccepted)
+		return
+	}
+
+	pdfBytes, err := h.pdfExporter.GeneratePDF(r.Context(), deal.Deck.HTML)
+	if err != nil {
+		log.Printf("PDF generation failed for deal %s: %v", dealID, err)
+		http.Error(w, "PDF generation failed: "+err.Error(), http.StatusInternalServerError)
+		return
+	}
+
+	filename := strings.ReplaceAll(deal.Property.Name, " ", "_") + "_Deck.pdf"
+	w.Header().Set("Content-Type", "application/pdf")
+	w.Header().Set("Content-Disposition", fmt.Sprintf(`attachment; filename="%s"`, filename))
+	w.Header().Set("Content-Length", strconv.Itoa(len(pdfBytes)))
+	w.Write(pdfBytes)
+}
+
+// UpdateSection handles PUT /api/deals/{dealID}/sections/{sectionIdx}
+// This powers the deck editor — brokers can tweak individual sections.
+// Henry's React editor lets users adjust content without losing AI benefits.
+type UpdateSectionRequest struct {
+	Title   string `json:"title"`
+	Content string `json:"content"`
+}
+
+func (h *Handler) UpdateSection(w http.ResponseWriter, r *http.Request) {
+	dealID := chi.URLParam(r, "dealID")
+	sectionIdxStr := chi.URLParam(r, "sectionIdx")
+	sectionIdx, err := strconv.Atoi(sectionIdxStr)
+	if err != nil {
+		http.Error(w, "invalid section index", http.StatusBadRequest)
+		return
+	}
+
+	h.mu.Lock()
+	deal, ok := h.deals[dealID]
+	if !ok {
+		h.mu.Unlock()
+		http.Error(w, "deal not found", http.StatusNotFound)
+		return
+	}
+
+	if deal.Deck == nil || sectionIdx < 0 || sectionIdx >= len(deal.Deck.Sections) {
+		h.mu.Unlock()
+		http.Error(w, "invalid section", http.StatusBadRequest)
+		return
+	}
+
+	var req UpdateSectionRequest
+	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
+		h.mu.Unlock()
+		http.Error(w, "invalid JSON", http.StatusBadRequest)
+		return
+	}
+
+	if req.Title != "" {
+		deal.Deck.Sections[sectionIdx].Title = req.Title
+	}
+	if req.Content != "" {
+		deal.Deck.Sections[sectionIdx].Content = req.Content
+	}
+
+	// Rebuild HTML with updated sections
+	deal.Deck.HTML = h.builder.RebuildHTML(deal)
+	h.mu.Unlock()
+
+	w.Header().Set("Content-Type", "application/json")
+	json.NewEncoder(w).Encode(deal.Deck.Sections[sectionIdx])
+}
+
+// GetSections handles GET /api/deals/{dealID}/sections
+// Returns the structured section data for the deck editor.
+func (h *Handler) GetSections(w http.ResponseWriter, r *http.Request) {
+	dealID := chi.URLParam(r, "dealID")
+
+	h.mu.RLock()
+	deal, ok := h.deals[dealID]
+	h.mu.RUnlock()
+
+	if !ok {
+		http.Error(w, "deal not found", http.StatusNotFound)
+		return
+	}
+
+	if deal.Deck == nil {
+		http.Error(w, "deck not yet generated", http.StatusAccepted)
+		return
+	}
+
+	w.Header().Set("Content-Type", "application/json")
+	json.NewEncoder(w).Encode(deal.Deck.Sections)
 }
